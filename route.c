@@ -57,7 +57,7 @@ vincenty_distance(double lng1, double lat1, double lng2, double lat2, long iterL
     double uSq = cosSqAlpha * (_square(WGS84_a) - _square(WGS84_b)) / _square(WGS84_b);
     double A = 1 + uSq/16384 * (4096 + uSq * (-768 + uSq * (320-175*uSq)));
     double B = uSq/1024 * (256 + uSq * (-128 + uSq * (74-47*uSq)));
-    double deltaSigma = B * sinSigma * (cos2SigmaM + B/4 * (cosSigma*(-1 + 2*_square(cos2SigmaM))) - B/6 * cos2SigmaM * (-3 + 4*_square(sinSigma)) * (-3 + 4*_square(cos2SigmaM)));
+    double deltaSigma = B * sinSigma * (cos2SigmaM + B/4 * cosSigma*(-1 + 2*_square(cos2SigmaM)) - B/6 * cos2SigmaM * (-3 + 4*_square(sinSigma)) * (-3 + 4*_square(cos2SigmaM)));
 
     return WGS84_b * A * (sigma-deltaSigma);
 }
