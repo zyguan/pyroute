@@ -6,12 +6,13 @@
 #define WGS84_f (1/298.257223563)
 #define _square(x) ((x)*(x))
 #define _hav(x) _square(sin((x)/2.0))
+#define _to_rad(x) ((x)*M_PI/180.0)
 
 #define F_VINCENTY  1
 #define F_HAVERSINE 2
 
 static double
-vincenty_distance(double lng1, double lat1, double lng2, double lat2, long iterLimit)
+vincenty_distance(double lat1, double lng1, double lat2, double lng2, long iterLimit)
 {
     if (lng1 == lng2 && lat1 == lat2) {
         return 0;
@@ -63,19 +64,19 @@ vincenty_distance(double lng1, double lat1, double lng2, double lat2, long iterL
 }
 
 static double
-haversine_distance(double lng1, double lat1, double lng2, double lat2)
+haversine_distance(double lat1, double lng1, double lat2, double lng2)
 {
     return 2.0 * EARTH_RADIUS * asin(sqrt(_hav(lat2-lat1) + cos(lat1)*cos(lat2)*_hav(lng2-lng1)));
 }
 
 static PyObject *
 distance(PyObject *self, PyObject *args) {
-    double lng1, lat1, lng2, lat2, d = 0;
+    double lat1, lng1, lat2, lng2, d = 0;
     long limit = -1;
     long formula = -1;
 
     if (!PyArg_ParseTuple(args, "dddd|ll:distance",
-                          &lng1, &lat1, &lng2, &lat2, &formula, &limit)) {
+                          &lat1, &lng1, &lat2, &lng2, &formula, &limit)) {
         return NULL;
     };
 
@@ -91,10 +92,12 @@ distance(PyObject *self, PyObject *args) {
         limit = 20;
     }
 
+    lat1 = _to_rad(lat1), lng1 = _to_rad(lng1);
+    lat2 = _to_rad(lat2), lng2 = _to_rad(lng2);
     if (formula == F_VINCENTY) {
-        d = vincenty_distance(lng1, lat1, lng2, lat2, limit);
+        d = vincenty_distance(lat1, lng1, lat2, lng2, limit);
     } else if (formula == F_HAVERSINE) {
-        d = haversine_distance(lng1, lat1, lng2, lat2);
+        d = haversine_distance(lat1, lng1, lat2, lng2);
     }
 
     return PyFloat_FromDouble(d);
@@ -124,7 +127,7 @@ measure(PyObject *self, PyObject *args) {
 
     // check route type
     if (!PySequence_Check(ps)) {
-        PyErr_SetString(PyExc_TypeError, "route must be a sequence of tuple(lng:float, lat:float)");
+        PyErr_SetString(PyExc_TypeError, "route must be a sequence of tuple(lat:float, lng:float)");
         return NULL;
     }
 
@@ -136,50 +139,50 @@ measure(PyObject *self, PyObject *args) {
         return NULL;
     }
 
-    double lng1, lat1, lng2, lat2, dsum = 0;
+    double lat1, lng1, lat2, lng2, dsum = 0;
 
     for (Py_ssize_t i = 0; i < len; i++) {
         // check type
         PyObject *p = PySequence_GetItem(ps, i);
         if (!PyTuple_Check(p)) {
             Py_XDECREF(p); Py_DECREF(ds);
-            PyErr_SetString(PyExc_TypeError, "route must be a sequence of tuple(lng:float, lat:float)");
+            PyErr_SetString(PyExc_TypeError, "route must be a sequence of tuple(lat:float, lng:float)");
             return NULL;
         }
         if (PyTuple_Size(p) != 2) {
             Py_XDECREF(p); Py_DECREF(ds);
-            PyErr_SetString(PyExc_TypeError, "route must be a sequence of tuple(lng:float, lat:float)");
+            PyErr_SetString(PyExc_TypeError, "route must be a sequence of tuple(lat:float, lng:float)");
             return NULL;
         }
-        PyObject *lng = PyTuple_GetItem(p, 0);
-        if (!PyFloat_Check(lng)) {
-            Py_XDECREF(p); Py_DECREF(ds);
-            PyErr_SetString(PyExc_TypeError, "route must be a sequence of tuple(lng:float, lat:float)");
-            return NULL;
-        }
-        PyObject *lat = PyTuple_GetItem(p, 1);
+        PyObject *lat = PyTuple_GetItem(p, 0);
         if (!PyFloat_Check(lat)) {
             Py_XDECREF(p); Py_DECREF(ds);
-            PyErr_SetString(PyExc_TypeError, "route must be a sequence of tuple(lng:float, lat:float)");
+            PyErr_SetString(PyExc_TypeError, "route must be a sequence of tuple(lat:float, lng:float)");
+            return NULL;
+        }
+        PyObject *lng = PyTuple_GetItem(p, 1);
+        if (!PyFloat_Check(lng)) {
+            Py_XDECREF(p); Py_DECREF(ds);
+            PyErr_SetString(PyExc_TypeError, "route must be a sequence of tuple(lat:float, lng:float)");
             return NULL;
         }
 
-        lng2 = PyFloat_AsDouble(lng);
-        lat2 = PyFloat_AsDouble(lat);
+        lat2 = _to_rad(PyFloat_AsDouble(lat));
+        lng2 = _to_rad(PyFloat_AsDouble(lng));
         Py_DECREF(p);
 
         if (i > 0) {
             if (formula == F_VINCENTY) {
-                dsum += vincenty_distance(lng1, lat1, lng2, lat2, limit);
+                dsum += vincenty_distance(lat1, lng1, lat2, lng2, limit);
             } else if (formula == F_HAVERSINE) {
-                dsum += haversine_distance(lng1, lat1, lng2, lat2);
+                dsum += haversine_distance(lat1, lng1, lat2, lng2);
             }
         }
 
         PyList_SetItem(ds, i, PyFloat_FromDouble(dsum));
 
-        lng1 = lng2;
         lat1 = lat2;
+        lng1 = lng2;
     }
 
     return ds;

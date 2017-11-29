@@ -15,19 +15,25 @@ class PythonImpl(object):
     def hav(x):
         return (sin(x)/2)**2
 
+    @staticmethod
+    def to_rad(*xs):
+        return [x*pi/180 for x in xs]
+
     @classmethod
     def rlat(cls, x):
         return atan((1-cls.WGS84_f) * tan(x))
 
     @classmethod
-    def harversine(cls, lng1, lat1, lng2, lat2):
+    def harversine(cls, lat1, lng1, lat2, lng2):
+        lat1, lng1, lat2, lng2 = cls.to_rad(lat1, lng1, lat2, lng2)
         return 2 * cls.EARTH_RADIUS * asin(
             sqrt(cls.hav(lat2-lat1) + cos(lat1)*cos(lat2)*cls.hav(lng2-lng1)))
 
     @classmethod
-    def vincenty(cls, lng1, lat1, lng2, lat2, limit=20):
+    def vincenty(cls, lat1, lng1, lat2, lng2, limit=20):
         if lng1 == lng2 and lat1 == lat2:
             return .0
+        lat1, lng1, lat2, lng2 = cls.to_rad(lat1, lng1, lat2, lng2)
         L = lng2 - lng1
         U1, U2 = cls.rlat(lat1), cls.rlat(lat2)
         sinU1, cosU1 = sin(U1), cos(U1)
@@ -75,47 +81,55 @@ class PythonImpl(object):
         return ds
 
 
+def test_py_vincenty():
+    assert abs(PythonImpl.vincenty(
+        43.65331, -79.38277, 43.65244, -79.38243) - 100.478) < 0.1
+    assert abs(PythonImpl.vincenty(0.001, 0, 0, 0) - 110.574) < 0.01
+    assert abs(PythonImpl.vincenty(0, 0.001, 0, 0) - 111.319) < 0.01
+    assert PythonImpl.vincenty(0, 0, 0, 0) == 0
+
+
+def test_py_haversine():
+    assert abs(PythonImpl.harversine(
+        43.65331, -79.38277, 43.65244, -79.38243) - 100.478) < 1.0
+    assert abs(PythonImpl.harversine(0.001, 0, 0, 0) - 110.574) < 1.0
+    assert (PythonImpl.harversine(0.001, 0, 0, 0)
+            ==
+            PythonImpl.harversine(0, 0.001, 0, 0))
+    assert PythonImpl.harversine(0, 0, 0, 0) == 0
+
+
 @pytest.fixture(scope="session")
 def points():
-    return map(lambda t: (t[0]*pi/180, t[1]*pi/180),
-               fixture.routes[0]['coordinates'])
+    return fixture.routes[0]['coordinates']
 
 
 @pytest.mark.benchmark(group="distance")
 def test_distance_vincenty_c(benchmark):
-    benchmark(route.distance,
-              -1.385490705853379,
-              0.7618939888937657,
-              -1.291657616475959,
-              0.7105718841071718)
+    benchmark(route.distance_vincenty,
+              43.65331, -79.38277,
+              43.65244, -79.38243)
 
 
 @pytest.mark.benchmark(group="distance")
 def test_distance_vincenty_py(benchmark):
     benchmark(PythonImpl.vincenty,
-              -1.385490705853379,
-              0.7618939888937657,
-              -1.291657616475959,
-              0.7105718841071718)
+              43.65331, -79.38277,
+              43.65244, -79.38243)
 
 
 @pytest.mark.benchmark(group="distance")
 def test_distance_haversine_c(benchmark):
-    benchmark(route.distance,
-              -1.385490705853379,
-              0.7618939888937657,
-              -1.291657616475959,
-              0.7105718841071718,
-              route.HAVERSINE)
+    benchmark(route.distance_haversine,
+              43.65331, -79.38277,
+              43.65244, -79.38243)
 
 
 @pytest.mark.benchmark(group="distance")
 def test_distance_haversine_py(benchmark):
     benchmark(PythonImpl.harversine,
-              -1.385490705853379,
-              0.7618939888937657,
-              -1.291657616475959,
-              0.7105718841071718)
+              43.65331, -79.38277,
+              43.65244, -79.38243)
 
 
 @pytest.mark.benchmark(group="measure")
