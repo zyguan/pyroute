@@ -1,5 +1,9 @@
 #include <Python.h>
 
+#ifndef M_PI
+#define M_PI (3.14159265358979323846)
+#endif
+
 #define EARTH_RADIUS 6356752.0
 #define WGS84_a 6378137.0
 #define WGS84_b 6356752.3142
